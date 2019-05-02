@@ -21,7 +21,10 @@ class tumor_study():
         self.model_path   = model_path
         self.dir_tmp      = ''
         self.dir_study    = ''
-        self.series_picks = pd.DataFrame()
+        self.series_picks = pd.DataFrame({'class': ['flair', 't1', 't1ce', 't2'],
+                                          'prob': '',
+                                          'SeriesNumber': '',
+                                          'series': ''})
         self.MNI_ref      = fsl.Info.standard_image('MNI152_T1_1mm_brain.nii.gz')
         self.brats_ref    = pkg_resources.resource_filename(__name__, 'brats_ref_reorient.nii.gz')
         self.n_procs      = 8
@@ -44,7 +47,6 @@ class tumor_study():
 
     def classify_series(self):
         """Classify series into modalities"""
-
         pkgs = ['oro.dicom', 'tidyverse', 'tidytext', 'tm', 'caret']
         _ = [ro.r['library'](x) for x in pkgs]
         ro.r['load'](self.model_path)
@@ -52,6 +54,10 @@ class tumor_study():
         self.series_picks = ro.r['predict_headers'](os.path.dirname(self.dir_study), ro.r['models'], ro.r['tb_preproc'])
         paths = [os.path.abspath(os.path.join(self.dir_study, series)) for series in self.series_picks.series.tolist()]
         self.series_picks['series'] = paths
+
+    def add_paths(self, paths):
+        """Manually specify directory paths to required series"""
+        self.series_picks.series = paths
 
     def preprocess(self):
         """Preprocess clinical data according to BraTS specs"""
@@ -72,9 +78,11 @@ class tumor_study():
         wf.run('MultiProc', plugin_args={'n_procs': self.n_procs})
 
     def __str__(self):
+        s_picks = str(self.series_picks.iloc[:, 0:3]) if not self.series_picks.empty else ''
         s = ('Brain Tumor object\n'
             f'  Accession #: {self.acc}\n'
-            f'  tmp_dir: {self.dir_tmp}')
+            f'  tmp_dir: {self.dir_tmp}\n'
+            f'  Series picks:\n{s_picks}')
         return s
 
     def rm_tmp(self):

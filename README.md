@@ -60,7 +60,14 @@ These tools expect an `<accession>.zip` file as input. The archive should contai
 
 A small but important step in processing clinical data involves identifying the desired input series. For a given application/context, this can be done easily by training a small classifier to identify series type (e.g. axial 3D T1, FLAIR, etc.) based on DICOM header data (study code, TR, TE, series description, etc.). We do that here by loading a custom pre-trained `model.Rdata` file. See URL for details.
 
-Otherwise, series should be manually identified. 
+Otherwise, series directory paths may be manually added like:
+
+```
+mri.add_paths(['/path/to/flair', 
+               '/path/to/t1', 
+               '/path/to/t1ce', 
+               '/path/to/t2'])
+```
 
 ## Preprocessing pipeline
 
