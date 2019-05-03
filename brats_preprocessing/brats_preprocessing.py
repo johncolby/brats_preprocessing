@@ -8,9 +8,6 @@ import nibabel as nib
 
 from nipype.interfaces import fsl
 
-import rpy2.robjects as ro
-from rpy2.robjects import pandas2ri
-pandas2ri.activate()
 import pandas as pd
 
 from .pipelines import dcm2nii, non_t1, merge_orient
@@ -47,6 +44,10 @@ class tumor_study():
 
     def classify_series(self):
         """Classify series into modalities"""
+        import rpy2.robjects as ro
+        from rpy2.robjects import pandas2ri
+        pandas2ri.activate()
+
         pkgs = ['oro.dicom', 'tidyverse', 'tidytext', 'tm', 'caret']
         _ = [ro.r['library'](x) for x in pkgs]
         ro.r['load'](self.model_path)
