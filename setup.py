@@ -9,6 +9,6 @@ setup(
     description='Tools for preprocessing clinical data according to BraTS specification',
     packages=['brats_preprocessing'],
     install_requires=['nibabel', 'nipype', 'pandas'],
-    extras_require={'classify_series': ['rpy2']},
+    extras_require={'classify_series': ['rpy2'], 'download': ['air_download']},
     include_package_data=True,
 )

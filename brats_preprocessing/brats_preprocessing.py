@@ -13,7 +13,7 @@ import pandas as pd
 from .pipelines import dcm2nii, non_t1, merge_orient
 
 class tumor_study():
-    def __init__(self, zip_path, model_path):
+    def __init__(self, acc='', zip_path='', model_path=''):
         self.zip_path     = zip_path
         self.model_path   = model_path
         self.dir_tmp      = ''
@@ -26,21 +26,46 @@ class tumor_study():
         self.brats_ref    = pkg_resources.resource_filename(__name__, 'brats_ref_reorient.nii.gz')
         self.n_procs      = 8
         self.channels     = ['flair', 't1', 't1ce', 't2']
-        self.acc          = ''
+        self.acc          =  os.path.splitext(os.path.basename(self.zip_path))[0] if self.zip_path else acc
+        assert self.acc, 'No accession number provided.'
 
-    def setup(self):
-        """Setup study for processing"""
-        # Create temporary working directory
-        self.dir_tmp = tempfile.mkdtemp()
-        os.mkdir(os.path.join(self.dir_tmp, 'nii'))
+    def download(self, URL, cred_path):
+        """Download study via AIR API"""
+        import air_download.air_download as air
+        import argparse
 
-        # Extract study archive
-        self.acc = os.path.splitext(os.path.basename(self.zip_path))[0]
+        assert not self.zip_path, '.zip path already available.'
+        assert self.dir_tmp, 'Working area not setup yet.'
+        args = argparse.Namespace()
+        args.URL = URL
+        args.acc = self.acc
+        args.cred_path = cred_path
+        args.profile = -1
+        args.output = os.path.join(self.dir_tmp, f'{self.acc}.zip')
+        air.main(args)
+        self.zip_path = args.output
+        self._extract()
+
+    def _extract(self):
+        """Extract study archive"""
+        assert not self.dir_study, 'dir_study already exists.'
         dir_study = os.path.join(self.dir_tmp, self.acc)
         os.mkdir(dir_study)
         zip_ref = zipfile.ZipFile(self.zip_path, 'r')
         zip_ref.extractall(path = dir_study)
         self.dir_study = os.path.join(dir_study, os.listdir(dir_study)[0])
+
+    def setup(self):
+        """Setup study for processing"""
+        # Create temporary working directory
+        if not self.dir_tmp:
+            self.dir_tmp = tempfile.mkdtemp()
+            os.mkdir(os.path.join(self.dir_tmp, 'nii'))
+
+        # Extract study archive
+        if not self.dir_study and self.zip_path:
+            self._extract()
+
 
     def classify_series(self):
         """Classify series into modalities"""
