@@ -56,13 +56,21 @@ These tools expect an `<accession>.zip` file as input. The archive should contai
   ...
 ```
 
+Alternatively, if `air_download` is installed, you may use the `download()` method to access the AIR API directly.
+
+```python
+mri = bp.tumor_study(acc='11111111')
+mri.setup()
+mri.download(URL='https://air.<domain>.edu/api/', cred_path='/path/to/air_login.txt')
+```
+
 ## Series classification
 
 A small but important step in processing clinical data involves identifying the desired input series. For a given application/context, this can be done easily by training a small classifier to identify series type (e.g. axial 3D T1, FLAIR, etc.) based on DICOM header data (study code, TR, TE, series description, etc.). We do that here by loading a custom pre-trained `model.Rdata` file. See URL for details.
 
-Otherwise, series directory paths may be manually added like:
+Alternatively, series directory paths may be manually added like:
 
-```
+```python
 mri.add_paths(['/path/to/flair', 
                '/path/to/t1', 
                '/path/to/t1ce', 
@@ -103,9 +111,9 @@ MNI and BraTS template systems are different.
 Calculate voxel offsets needed to match origins between BraTS and MNI.
 
 ```R
-90 + (240 - 182) / 2  # x = 119
+90  + (240 - 182) / 2 # x = 119
 126 + (240 - 218) / 2 # y = 137
-72 + (155 - 182) / 2  # z = 58.5
+72  + (155 - 182) / 2 # z = 58.5
 ```
 
 Can generate a minimal BraTS orientation template *de novo* like:
