@@ -13,20 +13,20 @@ import pandas as pd
 from .pipelines import dcm2nii, non_t1, merge_orient
 
 class tumor_study():
-    def __init__(self, acc='', zip_path='', model_path=''):
+    def __init__(self, acc='', zip_path='', model_path='', n_procs=4):
         self.zip_path     = zip_path
         self.model_path   = model_path
         self.dir_tmp      = ''
         self.dir_study    = ''
-        self.series_picks = pd.DataFrame({'class': ['flair', 't1', 't1ce', 't2'],
+        self.channels     = ['flair', 't1', 't1ce', 't2']
+        self.series_picks = pd.DataFrame({'class': self.channels,
                                           'prob': '',
                                           'SeriesNumber': '',
                                           'series': ''})
         self.MNI_ref      = fsl.Info.standard_image('MNI152_T1_1mm_brain.nii.gz')
         self.brats_ref    = pkg_resources.resource_filename(__name__, 'brats_ref_reorient.nii.gz')
-        self.n_procs      = 8
-        self.channels     = ['flair', 't1', 't1ce', 't2']
-        self.acc          =  os.path.splitext(os.path.basename(self.zip_path))[0] if self.zip_path else acc
+        self.n_procs      = n_procs
+        self.acc          = os.path.splitext(os.path.basename(self.zip_path))[0] if self.zip_path else acc
         assert self.acc, 'No accession number provided.'
 
     def download(self, URL, cred_path):
