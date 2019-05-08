@@ -73,8 +73,7 @@ class tumor_study():
         from rpy2.robjects import pandas2ri
         pandas2ri.activate()
 
-        pkgs = ['oro.dicom', 'tidyverse', 'tidytext', 'tm', 'caret']
-        _ = [ro.r['library'](x) for x in pkgs]
+        ro.r['library']('dcmclass')
         ro.r['load'](self.model_path)
 
         self.series_picks = ro.r['predict_headers'](os.path.dirname(self.dir_study), ro.r['models'], ro.r['tb_preproc'])
