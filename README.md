@@ -14,7 +14,7 @@ import brats_preprocessing.brats_preprocessing as bp
 zip_path = '/path/to/<accession>.zip'
 model_path = '/path/to/model.Rdata'
 
-mri = bp.tumor_study(zip_path, model_path)
+mri = bp.tumor_study(zip_path=zip_path, model_path=model_path)
 
 mri.setup()
 mri.classify_series()
