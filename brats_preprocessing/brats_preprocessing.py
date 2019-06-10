@@ -49,7 +49,7 @@ class tumor_study():
     def _extract(self):
         """Extract study archive"""
         assert not self.dir_study, 'dir_study already exists.'
-        dir_study = os.path.join(self.dir_tmp, self.acc)
+        dir_study = os.path.join(self.dir_tmp, 'dcm')
         os.mkdir(dir_study)
         zip_ref = zipfile.ZipFile(self.zip_path, 'r')
         zip_ref.extractall(path = dir_study)
@@ -106,7 +106,7 @@ class tumor_study():
         s_picks = str(self.series_picks.iloc[:, 0:3]) if not self.series_picks.empty else ''
         s = ('Brain Tumor object\n'
             f'  Accession #: {self.acc}\n'
-            f'  tmp_dir: {self.dir_tmp}\n'
+            f'  dir_tmp: {self.dir_tmp}\n'
             f'  Series picks:\n{s_picks}')
         return s
 
