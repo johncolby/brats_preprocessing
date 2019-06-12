@@ -5,6 +5,13 @@ import shutil
 import tempfile
 import zipfile
 import nibabel as nib
+import requests
+import pydicom
+import glob
+
+import rpy2.robjects as ro
+from rpy2.robjects import pandas2ri
+pandas2ri.activate()
 
 from nipype.interfaces import fsl
 
@@ -26,8 +33,9 @@ class tumor_study():
         self.MNI_ref      = fsl.Info.standard_image('MNI152_T1_1mm_brain.nii.gz')
         self.brats_ref    = pkg_resources.resource_filename(__name__, 'brats_ref_reorient.nii.gz')
         self.n_procs      = n_procs
-        self.acc          = os.path.splitext(os.path.basename(self.zip_path))[0] if self.zip_path else acc
-        assert self.acc, 'No accession number provided.'
+        self.acc          = acc
+        self.hdr          = ''
+        assert self.acc or self.zip_path, 'No input study provided.'
 
     def download(self, URL, cred_path):
         """Download study via AIR API"""
@@ -66,13 +74,15 @@ class tumor_study():
         if not self.dir_study and self.zip_path:
             self._extract()
 
+        # Load representative DICOM header
+        if self.dir_study and not self.hdr:
+            dcm_path = glob.glob(f'{self.dir_study}/*/*.dcm', recursive=True)[0]
+            self.hdr = pydicom.read_file(dcm_path)
+            self.acc = self.hdr.AccessionNumber
+
 
     def classify_series(self):
         """Classify series into modalities"""
-        import rpy2.robjects as ro
-        from rpy2.robjects import pandas2ri
-        pandas2ri.activate()
-
         ro.r['library']('dcmclass')
         ro.r['load'](self.model_path)
 
@@ -101,6 +111,29 @@ class tumor_study():
         wf = merge_orient(self.dir_tmp, self.brats_ref)
         wf.inputs.inputnode.in_files = [os.path.join(self.dir_tmp, 'mni', x + '.nii.gz') for x in self.channels[::-1]]
         wf.run('MultiProc', plugin_args={'n_procs': self.n_procs})
+
+    def segment(self, endpoint):
+        """Send POST request to model server endpoint and download results"""
+        preproc_path = os.path.join(self.dir_tmp, 'output', 'preprocessed.nii.gz')
+        data = open(preproc_path, 'rb').read()
+        download_stream = requests.post(endpoint, 
+                                        files = {'data': data}, 
+                                        stream = True)
+        # Save archive to disk
+        mask_path = os.path.join(self.dir_tmp, 'output', 'mask.nii.gz')
+        with open(mask_path, 'wb') as fd:
+            for chunk in download_stream.iter_content(chunk_size=8192):
+                if chunk:
+                    _ = fd.write(chunk)
+
+    def report(self):
+        """Generate PDF report"""
+        ro.r['library']('ucsfreports')
+        params = ro.ListVector({'input_path':   self.dir_tmp,
+                                'patient_name': self.hdr.PatientName.family_comma_given(),
+                                'patient_MRN':  self.hdr.PatientID,
+                                'patient_acc':  self.hdr.AccessionNumber})
+        ro.r['ucsf_report']('gbm', output_dir = self.dir_tmp, params = params)
 
     def __str__(self):
         s_picks = str(self.series_picks.iloc[:, 0:3]) if not self.series_picks.empty else ''
