@@ -94,6 +94,13 @@ class tumor_study():
         """Manually specify directory paths to required series"""
         self.series_picks.series = paths
 
+    def series_to_path(self, series):
+        """Convert a SeriesNumber to path"""
+        ro.r['library']('dcmclass')
+        ro.r['library']('dplyr')
+        tb = ro.r['load_study_headers'](os.path.join(self.dir_tmp, 'dcm'), 'SeriesNumber')
+        return tb.loc[tb['SeriesNumber'] == series]['path'][0]
+
     def preprocess(self):
         """Preprocess clinical data according to BraTS specs"""
         wf = dcm2nii(self.dir_tmp)
