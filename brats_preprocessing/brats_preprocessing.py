@@ -126,7 +126,7 @@ class tumor_study():
         download_stream = requests.post(endpoint, 
                                         files = {'data': data}, 
                                         stream = True)
-        # Save archive to disk
+        # Save output to disk
         mask_path = os.path.join(self.dir_tmp, 'output', 'mask.nii.gz')
         with open(mask_path, 'wb') as fd:
             for chunk in download_stream.iter_content(chunk_size=8192):
@@ -141,6 +141,11 @@ class tumor_study():
                                 'patient_MRN':  self.hdr.PatientID,
                                 'patient_acc':  self.hdr.AccessionNumber})
         ro.r['ucsf_report']('gbm', output_dir = self.dir_tmp, params = params)
+
+    def copy_results(self, output_dir = '.'):
+        src = os.path.join(self.dir_tmp, 'gbm.pdf')
+        dest = os.path.join(output_dir, f'{self.acc}_gbm.pdf')
+        shutil.copyfile(src, dest)
 
     def __str__(self):
         s_picks = str(self.series_picks.iloc[:, 0:3]) if not self.series_picks.empty else ''
