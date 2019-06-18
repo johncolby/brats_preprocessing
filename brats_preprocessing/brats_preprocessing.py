@@ -132,6 +132,14 @@ class tumor_study():
             for chunk in download_stream.iter_content(chunk_size=8192):
                 if chunk:
                     _ = fd.write(chunk)
+        # Save a version with matrix size matching MNI
+        FLIRT = fsl.FLIRT(in_file = mask_path, 
+                          reference = self.MNI_ref, 
+                          apply_xfm = True,
+                          uses_qform = True,
+                          out_file = os.path.join(self.dir_tmp, 'output', 'mask_mni.nii.gz'),
+                          out_matrix_file = os.path.join(self.dir_tmp, 'output', 'mask_mni.mat'))
+        FLIRT.run()
 
     def report(self):
         """Generate PDF report"""
