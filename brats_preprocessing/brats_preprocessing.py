@@ -1,4 +1,3 @@
-
 import os
 import pkg_resources
 import shutil
@@ -8,6 +7,7 @@ import nibabel as nib
 import requests
 import pydicom
 import glob
+from datetime import datetime
 
 import rpy2.robjects as ro
 from rpy2.robjects import pandas2ri
@@ -35,6 +35,7 @@ class tumor_study():
         self.n_procs      = n_procs
         self.acc          = acc
         self.hdr          = ''
+        self.study_date   = ''
         assert self.acc or self.zip_path, 'No input study provided.'
 
     def download(self, URL, cred_path):
@@ -79,7 +80,7 @@ class tumor_study():
             dcm_path = glob.glob(f'{self.dir_study}/*/*.dcm', recursive=True)[0]
             self.hdr = pydicom.read_file(dcm_path)
             self.acc = self.hdr.AccessionNumber
-
+            self.study_date = datetime.strptime(self.hdr.StudyDate, '%Y%m%d').strftime('%m/%d/%Y')
 
     def classify_series(self):
         """Classify series into modalities"""
@@ -147,7 +148,8 @@ class tumor_study():
         params = ro.ListVector({'input_path':   self.dir_tmp,
                                 'patient_name': self.hdr.PatientName.family_comma_given(),
                                 'patient_MRN':  self.hdr.PatientID,
-                                'patient_acc':  self.hdr.AccessionNumber})
+                                'patient_acc':  self.hdr.AccessionNumber,
+                                'study_date':   self.study_date})
         ro.r['ucsf_report']('gbm', output_dir = self.dir_tmp, params = params)
 
     def copy_results(self, output_dir = '.'):
