@@ -51,7 +51,7 @@ def t1(reference):
     wf.connect(applyxfm   , 'out_file'        , outputnode , 't1_brain_mask_mni')
     return wf
 
-def non_t1(base_dir, reference):
+def non_t1(base_dir, reference, mni_mask = False):
     """BraTS nipype workflow for non-T1 data"""
     t1_wf = t1(reference)
 
@@ -77,6 +77,16 @@ def non_t1(base_dir, reference):
     wf.connect(t1_wf        , 'outputnode.t1_brain_mask_mni' , apply_mask   , 'mask_file')
     wf.connect(apply_mask   , 'out_file'                     , datasink     , 'mni')
     wf.connect(t1_wf        , 'outputnode.t1_brain_mni'      , datasink     , 'mni.@t1')
+    
+    if mni_mask:
+        mni_mask_path = fsl.Info.standard_image('MNI152_T1_1mm_brain_mask.nii.gz')
+        wf.disconnect(wf.get_node('t1_workflow'), 'outputnode.t1_brain_mask_mni', 
+                      wf.get_node('apply_mask'),  'mask_file')
+        wf.get_node('apply_mask').inputs.mask_file = mni_mask_path
+        wf.get_node('t1_workflow').disconnect(wf.get_node('t1_workflow').get_node('applyxfm'),   'out_file', 
+                                              wf.get_node('t1_workflow').get_node('apply_mask'), 'mask_file')
+        wf.get_node('t1_workflow').inputs.apply_mask.mask_file = mni_mask_path
+
     return wf
 
 def merge_orient(base_dir, reference):

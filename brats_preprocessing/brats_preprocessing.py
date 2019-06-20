@@ -103,13 +103,13 @@ class tumor_study():
         tb = ro.r['load_study_headers'](os.path.join(self.dir_tmp, 'dcm'), 'SeriesNumber')
         return tb.loc[tb['SeriesNumber'] == series]['path'][0]
 
-    def preprocess(self):
+    def preprocess(self, mni_mask = False):
         """Preprocess clinical data according to BraTS specs"""
         wf = dcm2nii(self.dir_tmp)
         wf.inputs.inputnode.df = self.series_picks
         wf.run('MultiProc', plugin_args={'n_procs': self.n_procs})
 
-        wf = non_t1(self.dir_tmp, self.MNI_ref)
+        wf = non_t1(self.dir_tmp, self.MNI_ref, mni_mask)
         modalities = [x for x in self.channels if x != 't1']
         wf.inputs.t1_workflow.inputnode.t1_file = os.path.join(self.dir_tmp, 'nii', 't1.nii.gz')
         wf.get_node('inputnode').iterables = [('modality', modalities)]
@@ -180,6 +180,7 @@ def parse_args():
     parser.add_argument('model_path', help='path to model.Rdata for dcmclass')
     parser.add_argument('url_seg', help='URL for segmentation API')
     parser.add_argument('-c', '--cred_path', help='Login credentials file', default='./air_login.txt')
+    parser.add_argument('--mni_mask', help='Use an atlas-based mask instead of subject-based', action='store_true', default=False)
     arguments = parser.parse_args()
     return arguments
 
@@ -192,7 +193,7 @@ def cli():
         mri.download(URL = args.url_air, cred_path = args.cred_path)
         mri.setup()
         mri.classify_series()
-        mri.preprocess()
+        mri.preprocess(args.mni_mask)
         mri.segment(endpoint = args.url_seg)
         mri.report()
         mri.copy_results()
