@@ -8,6 +8,7 @@ import requests
 import pydicom
 import glob
 from datetime import datetime
+import argparse
 
 import rpy2.robjects as ro
 from rpy2.robjects import pandas2ri
@@ -171,3 +172,31 @@ class tumor_study():
             shutil.rmtree(self.dir_tmp)
         else:
             print('Nothing to remove.')
+
+def parse_args():
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('acc', metavar='accession', help='Accession # to process')
+    parser.add_argument('url_air', help='URL for AIR API, e.g. https://air.<domain>.edu/api/')
+    parser.add_argument('model_path', help='path to model.Rdata for dcmclass')
+    parser.add_argument('url_seg', help='URL for segmentation API')
+    parser.add_argument('-c', '--cred_path', help='Login credentials file', default='./air_login.txt')
+    arguments = parser.parse_args()
+    return arguments
+
+def cli():
+    args = parse_args()
+
+    try:
+        mri = tumor_study(acc = args.acc, model_path = args.model_path)
+        mri.setup()
+        mri.download(URL = args.url_air, cred_path = args.cred_path)
+        mri.setup()
+        mri.classify_series()
+        mri.preprocess()
+        mri.segment(endpoint = args.url_seg)
+        mri.report()
+        mri.copy_results()
+        mri.rm_tmp()
+    except:
+        print("Processing failed.")
+        mri.rm_tmp()
