@@ -24,36 +24,45 @@ def dcm2nii(base_dir):
     wf.connect(inputnode , 'channel' , dcm2niix , 'out_filename')
     return wf
 
-def t1(reference):
+def t1(reference, mni_mask = False):
     """BraTS nipype workflow for T1 data"""
-    inputnode  = Node(IdentityInterface(fields=['t1_file']), name='inputnode')
-    skullstrip = Node(fsl.BET(mask=True), name='skullstrip')
-    reg_to_mni = Node(fsl.FLIRT(reference=reference), name='reg_to_mni')
-    applyxfm   = Node(fsl.FLIRT(reference=reference, apply_xfm=True, interp='nearestneighbour'), name='applyxfm')
-    apply_mask = Node(fsl.maths.ApplyMask(), name='apply_mask')
-    outputnode = Node(IdentityInterface(fields=['t1_file',
+    inputnode   = Node(IdentityInterface(fields=['t1_file']), name='inputnode')
+    skullstrip1 = Node(fsl.BET(mask=True), name='skullstrip1')
+    reg_to_mni  = Node(fsl.FLIRT(reference=reference), name='reg_to_mni')
+    applyxfm    = Node(fsl.FLIRT(reference=reference, apply_xfm=True), name='applyxfm')
+    skullstrip2 = Node(fsl.BET(mask=True), name='skullstrip2')
+    apply_mask  = Node(fsl.maths.ApplyMask(), name='apply_mask')
+    outputnode  = Node(IdentityInterface(fields=['t1_file',
                                                 't1_brain', 
                                                 't1_brain_mni', 
                                                 't1_brain_mask_mni', 
                                                 'flirt_mat']), 
-                      name='outputnode')
+                       name='outputnode')
 
     wf = Workflow(name='t1_workflow')
-    wf.connect(inputnode  , 't1_file'         , skullstrip , 'in_file')
-    wf.connect(inputnode  , 't1_file'         , outputnode , 't1_file')
-    wf.connect(skullstrip , 'out_file'        , reg_to_mni , 'in_file')
-    wf.connect(reg_to_mni , 'out_matrix_file' , outputnode , 'flirt_mat')
-    wf.connect(skullstrip , 'mask_file'       , applyxfm   , 'in_file')
-    wf.connect(reg_to_mni , 'out_matrix_file' , applyxfm   , 'in_matrix_file')
-    wf.connect(reg_to_mni , 'out_file'        , apply_mask , 'in_file')
-    wf.connect(applyxfm   , 'out_file'        , apply_mask , 'mask_file')
-    wf.connect(apply_mask , 'out_file'        , outputnode , 't1_brain_mni')
-    wf.connect(applyxfm   , 'out_file'        , outputnode , 't1_brain_mask_mni')
+    wf.connect(inputnode   , 't1_file'         , skullstrip1 , 'in_file')
+    wf.connect(inputnode   , 't1_file'         , outputnode  , 't1_file')
+    wf.connect(inputnode   , 't1_file'         , applyxfm    , 'in_file')
+    wf.connect(skullstrip1 , 'out_file'        , reg_to_mni  , 'in_file')
+    wf.connect(reg_to_mni  , 'out_matrix_file' , outputnode  , 'flirt_mat')
+    wf.connect(reg_to_mni  , 'out_matrix_file' , applyxfm    , 'in_matrix_file')
+
+    if mni_mask:
+        wf.connect(applyxfm   , 'out_file' , apply_mask , 'in_file')
+        wf.connect(apply_mask , 'out_file' , outputnode , 't1_brain_mni')
+        mni_mask_path = fsl.Info.standard_image('MNI152_T1_1mm_brain_mask.nii.gz')
+        wf.inputs.apply_mask.mask_file = mni_mask_path
+        wf.inputs.outputnode.t1_brain_mask_mni = mni_mask_path
+    else:
+        wf.connect(applyxfm    , 'out_file'  , skullstrip2 , 'in_file')
+        wf.connect(skullstrip2 , 'out_file'  , outputnode  , 't1_brain_mni')
+        wf.connect(skullstrip2 , 'mask_file' , outputnode  , 't1_brain_mask_mni')
+
     return wf
 
 def non_t1(base_dir, reference, mni_mask = False):
     """BraTS nipype workflow for non-T1 data"""
-    t1_wf = t1(reference)
+    t1_wf = t1(reference, mni_mask)
 
     inputnode    = Node(IdentityInterface(fields=['modality']), name='inputnode')
     template = {'file_name': '{modality}.nii.gz'}
@@ -77,15 +86,6 @@ def non_t1(base_dir, reference, mni_mask = False):
     wf.connect(t1_wf        , 'outputnode.t1_brain_mask_mni' , apply_mask   , 'mask_file')
     wf.connect(apply_mask   , 'out_file'                     , datasink     , 'mni')
     wf.connect(t1_wf        , 'outputnode.t1_brain_mni'      , datasink     , 'mni.@t1')
-    
-    if mni_mask:
-        mni_mask_path = fsl.Info.standard_image('MNI152_T1_1mm_brain_mask.nii.gz')
-        wf.disconnect(wf.get_node('t1_workflow'), 'outputnode.t1_brain_mask_mni', 
-                      wf.get_node('apply_mask'),  'mask_file')
-        wf.get_node('apply_mask').inputs.mask_file = mni_mask_path
-        wf.get_node('t1_workflow').disconnect(wf.get_node('t1_workflow').get_node('applyxfm'),   'out_file', 
-                                              wf.get_node('t1_workflow').get_node('apply_mask'), 'mask_file')
-        wf.get_node('t1_workflow').inputs.apply_mask.mask_file = mni_mask_path
 
     return wf
 
