@@ -103,7 +103,7 @@ class tumor_study():
         tb = ro.r['load_study_headers'](os.path.join(self.dir_tmp, 'dcm'), 'SeriesNumber')
         return tb.loc[tb['SeriesNumber'] == series]['path'][0]
 
-    def preprocess(self, mni_mask = False):
+    def preprocess(self, mni_mask = False, do_bias_correct = False):
         """Preprocess clinical data according to BraTS specs"""
         wf = dcm2nii(self.dir_tmp)
         wf.inputs.inputnode.df = self.series_picks
@@ -117,8 +117,11 @@ class tumor_study():
         wf.write_graph(graph2use='colored', format='pdf')
         wf.run('MultiProc', plugin_args={'n_procs': self.n_procs})
 
-        wf = merge_orient(self.dir_tmp, self.brats_ref)
-        wf.inputs.inputnode.in_files = [os.path.join(self.dir_tmp, 'mni', x + '.nii.gz') for x in self.channels[::-1]]
+        wf = merge_orient(self.dir_tmp, self.brats_ref, do_bias_correct)
+        in_files = [os.path.join(self.dir_tmp, 'mni', x + '.nii.gz') for x in self.channels]
+        if do_bias_correct:
+            in_files.reverse()
+        wf.inputs.inputnode.in_files = in_files
         wf.run('MultiProc', plugin_args={'n_procs': self.n_procs})
 
     def segment(self, endpoint):
@@ -181,6 +184,7 @@ def parse_args():
     parser.add_argument('url_seg', help='URL for segmentation API')
     parser.add_argument('-c', '--cred_path', help='Login credentials file', default='./air_login.txt')
     parser.add_argument('--mni_mask', help='Use an atlas-based mask instead of subject-based', action='store_true', default=False)
+    parser.add_argument('--do_bias_correct', help='Use FSL FAST for multi-channel bias field correction', action='store_true', default=False)
     arguments = parser.parse_args()
     return arguments
 
@@ -193,7 +197,7 @@ def cli():
         mri.download(URL = args.url_air, cred_path = args.cred_path)
         mri.setup()
         mri.classify_series()
-        mri.preprocess(args.mni_mask)
+        mri.preprocess(args.mni_mask, args.do_bias_correct)
         mri.segment(endpoint = args.url_seg)
         mri.report()
         mri.copy_results()

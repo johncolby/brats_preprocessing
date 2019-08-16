@@ -89,7 +89,7 @@ def non_t1(base_dir, reference, mni_mask = False):
 
     return wf
 
-def merge_orient(base_dir, reference):
+def merge_orient(base_dir, reference, do_bias_correct = False):
     """Merge and reorient workflow"""
     inputnode    = Node(IdentityInterface(fields=['in_files']), name='inputnode')
     bias_correct = Node(fsl.FAST(output_biasfield=True, output_biascorrected=True), name='bias_correct')
@@ -97,11 +97,15 @@ def merge_orient(base_dir, reference):
     int16        = Node(fsl.maths.ChangeDataType(output_datatype='short'), name='int16')
     pad_orient   = Node(fsl.FLIRT(reference=reference, apply_xfm=True, uses_qform=True), name='pad_orient')
     datasink     = Node(DataSink(base_directory=base_dir), name='datasink')
-    datasink.inputs.substitutions = [('flair_restore_1_merged_chdt_flirt', 'preprocessed')]
+    datasink.inputs.substitutions = [('_restore_1', ''),
+                                     ('flair_merged_chdt_flirt', 'preprocessed')]
 
     wf = Workflow(name='merge_and_orient', base_dir=os.path.join(base_dir, 'nipype'))
-    wf.connect(inputnode    , 'in_files'       , bias_correct , 'in_files')
-    wf.connect(bias_correct , 'restored_image' , merge        , 'in_files')
+    if do_bias_correct:
+        wf.connect(inputnode    , 'in_files'       , bias_correct , 'in_files')
+        wf.connect(bias_correct , 'restored_image' , merge        , 'in_files')
+    else:
+        wf.connect(inputnode    , 'in_files'       , merge , 'in_files')        
     wf.connect(merge        , 'merged_file'    , int16        , 'in_file')
     wf.connect(int16        , 'out_file'       , pad_orient   , 'in_file')
     wf.connect(pad_orient   , 'out_file'       , datasink     , 'output')
