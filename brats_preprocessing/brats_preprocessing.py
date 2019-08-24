@@ -188,9 +188,7 @@ def parse_args():
     arguments = parser.parse_args()
     return arguments
 
-def cli():
-    args = parse_args()
-
+def process_gbm(args):
     try:
         mri = tumor_study(acc = args.acc, model_path = args.model_path)
         mri.setup()
@@ -202,6 +200,10 @@ def cli():
         mri.report()
         mri.copy_results()
         mri.rm_tmp()
-    except:
+    except Exception as e:
         print("Processing failed.")
+        print(e)
         mri.rm_tmp()
+
+def cli():
+    process_gbm(parse_args())
