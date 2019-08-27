@@ -9,6 +9,7 @@ import pydicom
 import glob
 from datetime import datetime
 import argparse
+import logging
 
 import rpy2.robjects as ro
 from rpy2.robjects import pandas2ri
@@ -200,9 +201,8 @@ def process_gbm(args):
         mri.report()
         mri.copy_results()
         mri.rm_tmp()
-    except Exception as e:
-        print("Processing failed.")
-        print(e)
+    except:
+        logging.exception('Processing failed.')
         mri.rm_tmp()
 
 def cli():
