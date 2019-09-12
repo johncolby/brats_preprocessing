@@ -155,12 +155,13 @@ class tumor_study():
                                 'patient_MRN':  self.hdr.PatientID,
                                 'patient_acc':  self.hdr.AccessionNumber,
                                 'study_date':   self.study_date})
-        ro.r['ucsf_report']('gbm', output_dir = self.dir_tmp, params = params)
+        ro.r['ucsf_report']('gbm', output_dir = os.path.join(self.dir_tmp, 'output'), params = params)
 
     def copy_results(self, output_dir = '.'):
-        src = os.path.join(self.dir_tmp, 'gbm.pdf')
-        dest = os.path.join(output_dir, f'{self.acc}_gbm.pdf')
-        shutil.copyfile(src, dest)
+        src = os.path.join(self.dir_tmp, 'output')
+        dest = os.path.join(output_dir, self.acc)
+        assert not os.path.exists(dest), 'Output directory already exists.'
+        shutil.copytree(src, dest)
 
     def __str__(self):
         s_picks = str(self.series_picks.iloc[:, 0:3]) if not self.series_picks.empty else ''
@@ -186,6 +187,7 @@ def parse_args():
     parser.add_argument('-c', '--cred_path', help='Login credentials file. If not present, will look for AIR_USERNAME and AIR_PASSWORD environment variables.', default=None)
     parser.add_argument('--mni_mask', help='Use an atlas-based mask instead of subject-based', action='store_true', default=False)
     parser.add_argument('--do_bias_correct', help='Use FSL FAST for multi-channel bias field correction', action='store_true', default=False)
+    parser.add_argument('--output_dir', help='Parent directory in which to save output', default='.')
     arguments = parser.parse_args()
     return arguments
 
@@ -199,7 +201,7 @@ def process_gbm(args):
         mri.preprocess(args.mni_mask, args.do_bias_correct)
         mri.segment(endpoint = args.seg_url)
         mri.report()
-        mri.copy_results()
+        mri.copy_results(output_dir = args.output_dir)
         mri.rm_tmp()
     except:
         logging.exception('Processing failed.')
