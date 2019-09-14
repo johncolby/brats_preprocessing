@@ -162,6 +162,8 @@ class tumor_study():
         dest = os.path.join(output_dir, self.acc)
         assert not os.path.exists(dest), 'Output directory already exists.'
         shutil.copytree(src, dest)
+        itk_file = pkg_resources.resource_filename(__name__, 'workspace.itksnap')
+        shutil.copy(itk_file, dest)
 
     def __str__(self):
         s_picks = str(self.series_picks.iloc[:, 0:3]) if not self.series_picks.empty else ''
