@@ -12,21 +12,28 @@ from .pipelines import dcm2nii, non_t1, merge_orient
 from radstudy import RadStudy
 
 class TumorStudy(RadStudy):
-    def __init__(self, acc='', zip_path='', model_path='', n_procs=4):
-        super().__init__(acc, zip_path, model_path)
-        self.app_name  = 'gbm'
-        self.MNI_ref   = fsl.Info.standard_image('MNI152_T1_1mm_brain.nii.gz')
-        self.brats_ref = pkg_resources.resource_filename(__name__, 'brats_ref_reorient.nii.gz')
-        self.n_procs   = n_procs
-        self.channels  = ['flair', 't1', 't1ce', 't2']
+    def __init__(self, mni_mask=False, do_bias_correct=False, n_procs=4, **kwargs):
+        super().__init__(**kwargs)
+        self.app_name        = 'gbm'
+        self.MNI_ref         = fsl.Info.standard_image('MNI152_T1_1mm_brain.nii.gz')
+        self.brats_ref       = pkg_resources.resource_filename(__name__, 'brats_ref_reorient.nii.gz')
+        self.n_procs         = n_procs
+        self.channels        = ['flair', 't1', 't1ce', 't2']
+        self.mni_mask        = mni_mask
+        self.do_bias_correct = do_bias_correct
 
-    def preprocess(self, mni_mask = False, do_bias_correct = False):
+    def process(self):
+        self.classify_series()
+        self.preprocess()
+        self.segment()
+
+    def preprocess(self):
         """Preprocess clinical data according to BraTS specs"""
         wf = dcm2nii(self.dir_tmp)
         wf.inputs.inputnode.df = self.series_picks
         wf.run('MultiProc', plugin_args={'n_procs': self.n_procs})
 
-        wf = non_t1(self.dir_tmp, self.MNI_ref, mni_mask)
+        wf = non_t1(self.dir_tmp, self.MNI_ref, self.mni_mask)
         modalities = [x for x in self.channels if x != 't1']
         wf.inputs.t1_workflow.inputnode.t1_file = os.path.join(self.dir_tmp, 'nii', 't1.nii.gz')
         wf.get_node('inputnode').iterables = [('modality', modalities)]
@@ -34,18 +41,18 @@ class TumorStudy(RadStudy):
         wf.write_graph(graph2use='colored', format='pdf')
         wf.run('MultiProc', plugin_args={'n_procs': self.n_procs})
 
-        wf = merge_orient(self.dir_tmp, self.brats_ref, do_bias_correct)
+        wf = merge_orient(self.dir_tmp, self.brats_ref, self.do_bias_correct)
         in_files = [os.path.join(self.dir_tmp, 'mni', x + '.nii.gz') for x in self.channels]
-        if do_bias_correct:
+        if self.do_bias_correct:
             in_files.reverse()
         wf.inputs.inputnode.in_files = in_files
         wf.run('MultiProc', plugin_args={'n_procs': self.n_procs})
 
-    def segment(self, endpoint):
+    def segment(self):
         """Send POST request to model server endpoint and download results"""
         preproc_path = os.path.join(self.dir_tmp, 'output', 'preprocessed.nii.gz')
         data = open(preproc_path, 'rb').read()
-        download_stream = requests.post(endpoint, 
+        download_stream = requests.post(self.process_url, 
                                         files = {'data': data}, 
                                         stream = True)
         # Save output to disk
@@ -78,22 +85,6 @@ def parse_args():
     parser.add_argument('--output_dir', help='Parent directory in which to save output', default='.')
     arguments = parser.parse_args()
     return arguments
-
-def process_gbm(args):
-    try:
-        mri = TumorStudy(acc = args.acc, model_path = args.model_path)
-        mri.setup()
-        mri.download(URL = args.air_url, cred_path = args.cred_path)
-        mri.setup()
-        mri.classify_series()
-        mri.preprocess(args.mni_mask, args.do_bias_correct)
-        mri.segment(endpoint = args.seg_url)
-        mri.report()
-        mri.copy_results(output_dir = args.output_dir)
-        mri.rm_tmp()
-    except:
-        logging.exception('Processing failed.')
-        mri.rm_tmp()
 
 def cli():
     process_gbm(parse_args())
