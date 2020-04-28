@@ -3,7 +3,6 @@ import pkg_resources
 import shutil
 import requests
 import argparse
-import logging
 
 from nipype.interfaces import fsl
 
@@ -11,15 +10,18 @@ from .pipelines import dcm2nii, non_t1, merge_orient
 
 from radstudy import RadStudy
 
+
 class TumorStudy(RadStudy):
+
     def __init__(self, mni_mask=False, do_bias_correct=False, n_procs=4, **kwargs):
         super().__init__(**kwargs)
-        self.app_name        = 'gbm'
-        self.MNI_ref         = fsl.Info.standard_image('MNI152_T1_1mm_brain.nii.gz')
-        self.brats_ref       = pkg_resources.resource_filename(__name__, 'brats_ref_reorient.nii.gz')
-        self.n_procs         = n_procs
-        self.channels        = ['flair', 't1', 't1ce', 't2']
-        self.mni_mask        = mni_mask
+
+        self.app_name = 'gbm'
+        self.MNI_ref = fsl.Info.standard_image('MNI152_T1_1mm_brain.nii.gz')
+        self.brats_ref = pkg_resources.resource_filename(__name__, 'brats_ref_reorient.nii.gz')
+        self.n_procs = n_procs
+        self.channels = ['flair', 't1', 't1ce', 't2']
+        self.mni_mask = mni_mask
         self.do_bias_correct = do_bias_correct
 
     def process(self):
@@ -52,9 +54,9 @@ class TumorStudy(RadStudy):
         """Send POST request to model server endpoint and download results"""
         preproc_path = os.path.join(self.dir_tmp, 'output', 'preprocessed.nii.gz')
         data = open(preproc_path, 'rb').read()
-        download_stream = requests.post(self.process_url, 
-                                        files = {'data': data}, 
-                                        stream = True)
+        download_stream = requests.post(self.process_url,
+                                        files={'data': data},
+                                        stream=True)
         # Save output to disk
         mask_path = os.path.join(self.dir_tmp, 'output', 'mask.nii.gz')
         with open(mask_path, 'wb') as fd:
@@ -62,16 +64,17 @@ class TumorStudy(RadStudy):
                 if chunk:
                     _ = fd.write(chunk)
         # Save a version with matrix size matching MNI
-        FLIRT = fsl.FLIRT(in_file = mask_path, 
-                          reference = self.MNI_ref, 
-                          apply_xfm = True,
-                          uses_qform = True,
-                          out_file = os.path.join(self.dir_tmp, 'output', 'mask_mni.nii.gz'),
-                          out_matrix_file = os.path.join(self.dir_tmp, 'output', 'mask_mni.mat'))
+        FLIRT = fsl.FLIRT(in_file=mask_path,
+                          reference=self.MNI_ref,
+                          apply_xfm=True,
+                          uses_qform=True,
+                          out_file=os.path.join(self.dir_tmp, 'output', 'mask_mni.nii.gz'),
+                          out_matrix_file=os.path.join(self.dir_tmp, 'output', 'mask_mni.mat'))
         FLIRT.run()
         # Save a template itksnap workspace
         itk_file = pkg_resources.resource_filename(__name__, 'workspace.itksnap')
         shutil.copy(itk_file, os.path.join(self.dir_tmp, 'output'))
+
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
