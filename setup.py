@@ -10,6 +10,7 @@ setup(
     packages=['brats_preprocessing'],
     install_requires=[
         'rad_apps @ git+https://git.radiology.ucsf.edu/jcolby/rad_apps.git#egg=rad_apps',
+        'unet_brats @ git+https://git.radiology.ucsf.edu/jcolby/unet_brats.git#egg=unet_brats',
         'nipype',
         'requests',
     ],

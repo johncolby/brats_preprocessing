@@ -1,4 +1,6 @@
+import mxnet as mx
 import os
+import pickle
 import pkg_resources
 import shutil
 import requests
@@ -9,6 +11,7 @@ from nipype.interfaces import fsl
 from .pipelines import dcm2nii, non_t1, merge_orient
 
 from radstudy import RadStudy
+from unet_brats.unet import nii_to_tensor, tensor_to_nii
 
 
 class TumorStudy(RadStudy):
@@ -52,17 +55,23 @@ class TumorStudy(RadStudy):
 
     def segment(self):
         """Send POST request to model server endpoint and download results"""
+        # Prepare data
         preproc_path = os.path.join(self.dir_tmp, 'output', 'preprocessed.nii.gz')
-        data = open(preproc_path, 'rb').read()
-        download_stream = requests.post(self.process_url,
-                                        files={'data': data},
-                                        stream=True)
-        # Save output to disk
+        img, nii_hdr = nii_to_tensor(preproc_path)
+        img_str = pickle.dumps(mx.nd.array(img))
+
+        # Post request to inference server
+        mask_str = requests.post(self.process_url,
+                                 files={'data': img_str},
+                                 stream=True)
+
+        # Convert predicted mask back to nii and save to disk
+        mask = pickle.loads(mask_str.content)
+        mask = mx.nd.array(mask).argmax_channel().squeeze().asnumpy()
+        mask_nii = tensor_to_nii(mask, nii_hdr)
         mask_path = os.path.join(self.dir_tmp, 'output', 'mask.nii.gz')
-        with open(mask_path, 'wb') as fd:
-            for chunk in download_stream.iter_content(chunk_size=8192):
-                if chunk:
-                    _ = fd.write(chunk)
+        mask_nii.to_filename(mask_path)
+
         # Save a version with matrix size matching MNI
         FLIRT = fsl.FLIRT(in_file=mask_path,
                           reference=self.MNI_ref,
